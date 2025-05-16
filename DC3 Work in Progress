@@ -1,0 +1,161 @@
+---
+title: 'Data Challenge 3: Differentiated goods demand estimation of U.S. Airline companies'
+author: "Scott Corbin and Blake Kancigor"
+date: "2025-05-14"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r include=FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+```
+
+```{r, echo=FALSE}
+data <- read.csv("~/Desktop/106 Data Challenge 2/airline_data_firmlevel.csv")
+```
+
+## Question 1
+
+The variable ‘marketsize’ is the total number of actual and potential passengers in each region. You will use this variable as a measure of total market size. The variable ‘ms_dif’ is the market share of each firm using ‘marketshare’ as the denominator. Compute the outside option in each market (hint: you can use the variable ‘ms_reg’, which is the sum of all market shares in each region/quarter/year market). Report the average and median outside option. Interpret these numbers.
+
+```{r}
+data$outside_option <- 1 - data$ms_reg
+
+mean_outside_option <- mean(data$outside_option, na.rm = TRUE)
+median_outside_option <- median(data$outside_option, na.rm = TRUE)
+
+cat("average outside option", round(mean_outside_option, 3), "\n")
+cat("median outside option", round(median_outside_option, 3), "\n")
+```
+
+\textcolor{blue}{The average (or mean) outside option is 0.9601, and the median outside option is 0.9585. This means that, on average, just over 96 percent of the market is not served by the observed carriers in the dataset. These passengers may be flying with other competitor airlines (that are unobserved in our data), using other transportation methods, or choosing not to travel at all. This high outside option shows how competitive and fragmented the airline industry is, and how the firms that we observed only capture a small portion of the total potential market. The small gap between the mean and median means that it is a right-skewed distribution, which means that there are a few markets with even higher outside shares that pull the mean up slightly.}
+
+## Question 2
+
+Specify a logit model with log(market share) -log(outside option) on the left-hand side, the price in logs on the right-hand side (i.e., the iso-elastic demand model), and an unobservable quality term . Do not include any observable firm characteristics. Define and explain all your variables and coefficients.
+
+
+
+```{r}
+data$price <- data$rev / data$passengers
+data$outside_option <- 1 - data$ms_reg
+data$log_share_ratio <- log(data$ms_dif / data$outside_option)
+data$log_price <- log(data$price)
+```
+
+\textcolor{blue}{$$
+\log(s_{jt}) - \log(s_{0t}) = \alpha \cdot \log(p_{jt}) + \xi_{jt}$$}
+
+\textcolor{blue}{Above is the equation that derived as the logit model with log(market share) - log(outside option) on the left-hand side, the iso-elastic demand model, and the unobservable quality term $\xi_{jt}$. Here is a breakdown of all of the variables and coefficents:}
+$$
+\color{blue}{
+\begin{aligned}
+s_{jt} &= \text{market share of airline } j \text{ in market } t \ (\text{ms\_dif}) \\
+s_{0t} &= \text{outside option share in market } t \ (1 - \text{ms\_reg}) \\
+p_{jt} &= \text{price of airline } j \text{ in market } t \ (\text{rev/passengers}) \\
+\alpha &= \text{price sensitivity (demand elasticity)} \\
+\xi_{jt} &= \text{unobserved quality of airline } j \text{ in market } t
+\end{aligned}
+}
+$$
+
+## Question 3
+
+Estimate the logit model using OLS. Why are these estimates biased?
+
+```{r}
+ols_model <- lm(log_share_ratio ~ log_price, data = data)
+summary(ols_model)
+```
+\textcolor{blue}{Above are the OLS estimates. They are biased because fare levels are not set randomly. Still, instead, they reflect unobserved route and airline-specific qualities such as service frequencey and brand loyalty, that also influence demand. Airlines will charge more on routes where they have better service, stronger brands, or other sub-perks, all of which boost demand. That means that higher fares and higher unobserved quality go hand in hand, so our price coefficient ends up biased toward zero. In conclusion , OLS underestimates how much passengers hesitate at a fare increase.}
+
+## Question 4
+
+Re-estimate the logit model but now use the fuel price (in levels) as an instrument for log prices. Compute the firm-level demand elasticity and interpret this number.
+
+```{r}
+library(AER)
+
+iv_model <- ivreg(log_share_ratio ~ log_price  | log(pfuel),  data = data)
+summary(iv_model, diagnostics = TRUE)
+```
+
+```{r}
+alpha_iv <- coef(iv_model)["log_price"]
+data$elasticity <- - alpha_iv * (1 - data$ms_dif)
+
+mean_elast <- mean(data$elasticity, na.rm = TRUE)
+median_elast <- median(data$elasticity, na.rm = TRUE)
+
+print(paste("Average own-price elasticity:", round(mean_elast, 3)))
+print(paste("Median own-price elasticity: ", round(median_elast, 3)))
+```
+
+\textcolor{blue}{Using fuel price as our instrument, the IV estimate of the price-sensitivity parameter comes out around 1.332. Putting that into the logit elasticity formula, we get an average own-price elasticity of about -1.31 (and a median of around -1.29). Thai means that once we get rid of the bias, a 1 percent fare increase leads, on average, to roughly a 1.3 percent drop in an airline’s share relative to the outside option. This also means that demand is price-elastic as passengers are fairly sensitive to changes in ticket price. }
+
+## Question 5
+
+Estimate the Lerner index and the markup. Estimate the average and median markup, and briefly discuss/interpret. 
+
+\textcolor{blue}{
+\textbf{Marginal Cost:} 
+\[
+MC = P \left(1 + \frac{1}{\varepsilon} \right)
+\]
+\begin{itemize}
+  \item $MC$: Marginal cost — cost of transporting one additional passenger
+  \item $P$: Ticket price
+  \item $\varepsilon$: Price elasticity of demand (should be negative)
+\end{itemize}
+}
+
+\textcolor{blue}{
+\textbf{Markup:} 
+\[
+Markup = P - MC
+\]
+\begin{itemize}
+  \item $Markup$: Dollar difference between price and marginal cost
+  \item $P$: Ticket price
+  \item $MC$: Marginal cost
+\end{itemize}
+}
+
+\textcolor{blue}{
+\textbf{Lerner Index:} 
+\[
+\frac{P - MC}{P}
+\]
+\begin{itemize}
+  \item $\frac{P - MC}{P}$: Proportion of price above marginal cost
+  \item $P$: Ticket price
+  \item $MC$: Marginal cost
+\end{itemize}
+}
+
+\textcolor{blue}{
+
+## Question 6
+
+Compare the median/average markup against the markups you estimated in DC1 and DC2.
+
+## Question 7
+
+Using your estimated markup and the marginal cost estimates from the prior data challenge, compute optimal pricing for every airline company in each region/year/quarter. Compare the median optimal price with the median observed price. How different are they? Is your optimal price higher or lower than the observed price? Why would airline companies set higher/lower prices than your computed price? (i.e. which factors affecting pricing did we ignore in our model and could matter for pricing decisions by airline companies?
+
+## Question 8
+
+Estimate airline quality as the residual$\xi_{ft}$ How is average quality different between United Airlines, Delta Airlines, American Airlines, and
+Southwest? Did you expect this result, or not? Explain.
+
+## Question 9
+
+In the previous data challenge, you ranked marginal costs for these four carriers. Based on these four companies, are higher marginal cost carriers also higher quality, or not? Explain your finding.
+
+## Question 10 (Bonus)
+
+Consider United and Delta in the domestic market in Q4 of 2022. Compute the diversion ratios between United and Delta and between Delta and United. Compute and report the Indicative Price Rise that would result from a merger between Delta and United, both at Delta airlines and at United airlines. Interpret your number. Based on your IPP estimate, do you think the DOJ will likely approve this merger, or not? Explain.
+

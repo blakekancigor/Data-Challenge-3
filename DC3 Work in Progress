@@ -1,20 +1,12 @@
 ---
-title: 'Data Challenge 3: Differentiated goods demand estimation of U.S. Airline companies'
-author: "Scott Corbin and Blake Kancigor"
-date: "2025-05-14"
+title: "Data Challenge 3"
+author: "Blake Kancigor"
+date: "2025-05-16"
 output: pdf_document
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
-
-```{r include=FALSE}
-knitr::opts_chunk$set(warning = FALSE, message = FALSE)
-```
-
 ```{r, echo=FALSE}
-data <- read.csv("~/Desktop/106 Data Challenge 2/airline_data_firmlevel.csv")
+data <- read.csv("~/Desktop/ECON 106/airline_data_firmlevel.csv")
 ```
 
 ## Question 1
@@ -76,6 +68,8 @@ summary(ols_model)
 
 Re-estimate the logit model but now use the fuel price (in levels) as an instrument for log prices. Compute the firm-level demand elasticity and interpret this number.
 
+install.packages("AER")
+
 ```{r}
 library(AER)
 
@@ -136,11 +130,49 @@ Markup = P - MC
 \end{itemize}
 }
 
-\textcolor{blue}{
+```{r}
+model <- lm(log(data$passengers) ~ log(data$price), data = data)
+summary(model)
+demand_elasticity <- coef(model)["log(data$price)"]
+print(paste("Demand Elasticity:", round(demand_elasticity, 3)))
+
+true_price <- data$price * 1000
+
+marginal_cost <- true_price * (1 + (1/demand_elasticity))
+
+markup <- true_price - marginal_cost
+
+lerner_index <- markup / true_price
+
+avg_markup <- mean(markup, na.rm = TRUE)
+med_markup <- median(markup, na.rm = TRUE)
+avg_lerner <- mean(lerner_index, na.rm = TRUE)
+med_lerner <- median(lerner_index, na.rm = TRUE)
+
+cat("Average Markup ($):", round(avg_markup, 2), "\n")
+cat("Median Markup ($):", round(med_markup, 2), "\n")
+cat("Average Lerner Index ($):", round(avg_lerner, 2), "\n")
+cat("Median Lerner Index ($):", round(med_lerner, 2), "\n")
+
+```
+
+\textcolor{blue}{Using our estimated price elasticity of demand (-1.485), we calculated the marginal cost, markup, and Lerner Index. We got an average markup of 196.27 dollars and a median markup of 87.27 dollars, meaning airlines are generally pricing well above their marginal cost. This means there is room for profitability even with elastic demand.}
+
+\textcolor{blue}{The Lerner Index, which measures market power, came out to approximately 0.67, aligning exactly with the theoretical value of -1 / elasticity of demand. This means that about 67 percent of the ticket price is markup above marginal cost, which is quite high and means that airlines definitely have some ability to price above cost despite the competitiveness of the industry.}
+
+\textcolor{blue}{Overall, these all show that while demand is elastic, airlines still maintain decent pricing power likely due to factors like route dominance, scheduling convenience, or customer loyalty.}
+
 
 ## Question 6
 
 Compare the median/average markup against the markups you estimated in DC1 and DC2.
+
+\textcolor{blue}{In this data challenge (DC3), we estimated an average markup of 196.27 dollars and a median markup of 87.27 dollars using a log-log demand model and a price elasticity of -1.485. These represent the amount airlines price above marginal cost per passenger. In comparison, the markups in DC1 were estimated using a production function approach, which gave us a mean markup of 1.836 (or 83.6 percent above marginal cost) and a median of 1.704 (or 70.4 percent). There were unitless markups derived from the output elasticity of labor and the labor share of revenue, without actually estimating demand elasticity.}
+
+\textcolor{blue}{In DC2, we calculated marginal cost and estimated markup by first estimating the demand elasticity directly using OLS and IV regressions. The implied markup using the IV-based elasticity of -0.5118 (from the Cournot pricing formula) led to higher optimal prices than observed prices, with a large gap of nearly 290 dollars between them, suggesting that markups were probably under-realized relative to what the theoretical optimum prices are. These also varied based on firm market share and competitive factors too.}
+
+\textcolor{blue}{Overall, the key differences come from the methods used: DC1 assumes markup based on the production function without estimating demand; DC2 uses a structural demand system with Cournot pricing; and DC3 uses a demand elasticity-based markup formula in dollar terms. The one we calculated in this data challenge aligns well with the more real-world pricing behavior and falls somewhere between the estimates of the other two when converted to comparable terms.}
+
 
 ## Question 7
 
@@ -158,4 +190,3 @@ In the previous data challenge, you ranked marginal costs for these four carrier
 ## Question 10 (Bonus)
 
 Consider United and Delta in the domestic market in Q4 of 2022. Compute the diversion ratios between United and Delta and between Delta and United. Compute and report the Indicative Price Rise that would result from a merger between Delta and United, both at Delta airlines and at United airlines. Interpret your number. Based on your IPP estimate, do you think the DOJ will likely approve this merger, or not? Explain.
-
